@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K.M.W Advanced Admin</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --primary: #FF4747; --bg: #F0F2F5; --white: #ffffff; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); padding-bottom: 70px; }
+        header { background: var(--white); padding: 15px; text-align: center; border-bottom: 1px solid #ddd; position: sticky; top: 0; z-index: 100; }
+        .header-title { font-size: 18px; font-weight: 800; color: var(--primary); }
+        .container { padding: 15px; }
+        .page { display: none; }
+        .page.active { display: block; animation: fadeIn 0.3s; }
+        .card { background: var(--white); border-radius: 15px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; }
+        .btn-main { background: var(--primary); color: #fff; border: none; padding: 15px; border-radius: 10px; width: 100%; font-weight: bold; cursor: pointer; }
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #fff; display: flex; border-top: 1px solid #ddd; }
+        .nav-item { flex: 1; text-align: center; padding: 10px; color: #888; cursor: pointer; font-size: 12px; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item i { font-size: 20px; display: block; margin-bottom: 2px; }
+        .stock-item { display: flex; gap: 10px; border-bottom: 1px solid #eee; padding: 10px 0; align-items: center; }
+        #preview-box { width: 100%; height: 160px; border: 2px dashed #ddd; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; overflow: hidden; background: #fafafa; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<header><div class="header-title">K.M.W WHOLESALE ADMIN</div></header>
+
+<div class="container">
+    <div id="page-orders" class="page active">
+        <div class="card"><h3><i class="fas fa-list"></i> အော်ဒါစာရင်း</h3><div id="order-list">ရှာဖွေနေသည်...</div></div>
+    </div>
+
+    <div id="page-stocks" class="page">
+        <div class="card"><h3><i class="fas fa-boxes"></i> ပစ္စည်းစာရင်း</h3><div id="stock-list">ရှာဖွေနေသည်...</div></div>
+    </div>
+
+    <div id="page-add" class="page">
+        <div class="card">
+            <h3 id="form-title">ပစ္စည်းအသစ်ထည့်ရန်</h3>
+            <input type="hidden" id="edit-id">
+            
+            <div id="preview-box" onclick="document.getElementById('p-file').click()">
+                <span id="pre-txt">ပုံရွေးရန် နှိပ်ပါ</span>
+                <img id="p-img" style="display:none; width:100%; height:100%; object-fit:cover;">
+            </div>
+            <input type="file" id="p-file" hidden onchange="preview(this)">
+
+            <input type="text" id="p-name" placeholder="ပစ္စည်းအမည် (ဥပမာ- Gold Ring)">
+            <select id="p-cat">
+                <option value="Jewelry">Jewelry</option>
+                <option value="Accessories">Accessories</option>
+                <option value="Others">Others</option>
+            </select>
+            
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="p-retail" placeholder="Retail Price (Ks)">
+                <input type="number" id="p-wholesale" placeholder="Wholesale Price (Ks)">
+            </div>
+            
+            <input type="number" id="p-moq" placeholder="အနည်းဆုံးမှာယူရမည့်အရေအတွက် (MOQ)" value="10">
+            <textarea id="p-desc" placeholder="အသေးစိတ်ဖော်ပြချက်" rows="2"></textarea>
+            
+            <button class="btn-main" id="btn-save" onclick="saveItem()">သိမ်းဆည်းမည်</button>
+            <button id="btn-cancel" style="display:none; margin-top:10px; border:none; background:none; color:grey; width:100%;" onclick="cancelEdit()">Edit မလုပ်တော့ပါ</button>
+        </div>
+    </div>
+</div>
+
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="nav('page-orders', this)"><i class="fas fa-shopping-bag"></i>Orders</div>
+    <div class="nav-item" onclick="nav('page-add', this)"><i class="fas fa-plus-circle"></i>Add Item</div>
+    <div class="nav-item" onclick="nav('page-stocks', this)"><i class="fas fa-warehouse"></i>Stocks</div>
+</div>
+
+<script>
+    const SB_URL = "https://ltusknkpwbyriikeyday.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0dXNrbmtwd2J5cmlpa2V5ZGF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyMTYxNDksImV4cCI6MjA4MTc5MjE0OX0.7TXAvr2tHl03m_gYZNYq8xyy0yYHTx0sYMN4tS6GDnA";
+    const _supa = supabase.createClient(SB_URL, SB_KEY);
+
+    let currentImgUrl = "";
+
+    function nav(id, el) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        if(el) el.classList.add('active');
+        if(id === 'page-stocks') loadStocks();
+        if(id === 'page-orders') loadOrders();
+    }
+
+    function preview(input) {
+        if (input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById('p-img').src = e.target.result;
+                document.getElementById('p-img').style.display = 'block';
+                document.getElementById('pre-txt').style.display = 'none';
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    async function saveItem() {
+        const id = document.getElementById('edit-id').value;
+        const file = document.getElementById('p-file').files[0];
+        const name = document.getElementById('p-name').value;
+        const retail = document.getElementById('p-retail').value;
+        const wholesale = document.getElementById('p-wholesale').value;
+        const moq = document.getElementById('p-moq').value;
+        const category = document.getElementById('p-cat').value;
+
+        if(!name || !retail || !wholesale) return alert("အချက်အလက်များ ပြည့်စုံစွာ ဖြည့်ပါ");
+
+        let imgUrl = currentImgUrl;
+        if (file) {
+            const fileName = Date.now() + ".jpg";
+            const { data: upData, error: upErr } = await _supa.storage.from('products').upload(fileName, file);
+            if(upErr) return alert("Upload Error: " + upErr.message);
+            const { data: url } = _supa.storage.from('products').getPublicUrl(fileName);
+            imgUrl = url.publicUrl;
+        }
+
+        const productData = {
+            name: name,
+            retail_price: parseInt(retail),
+            wholesale_price: parseInt(wholesale),
+            moq: parseInt(moq),
+            category: category,
+            image_url: imgUrl,
+            is_new: true
+        };
+
+        const result = id ? await _supa.from('products').update(productData).eq('id', id) : await _supa.from('products').insert([productData]);
+
+        if(!result.error) {
+            alert("အောင်မြင်ပါသည်");
+            location.reload();
+        } else {
+            alert("Error: " + result.error.message);
+        }
+    }
+
+    async function loadStocks() {
+        const { data } = await _supa.from('products').select('*').order('id', {ascending: false});
+        if(data) document.getElementById('stock-list').innerHTML = data.map(p => `
+            <div class="stock-item">
+                <img src="${p.image_url}" style="width:50px; height:50px; border-radius:8px; object-fit:cover;">
+                <div style="flex:1"><b>${p.name}</b><br><small>R: ${p.retail_price} | W: ${p.wholesale_price} | MOQ: ${p.moq}</small></div>
+                <button style="border:none; background:#eee; padding:5px 10px; border-radius:5px;" onclick='openEdit(${JSON.stringify(p).replace(/'/g, "&apos;")})'>Edit</button>
+            </div>
+        `).join('');
+    }
+
+    async function loadOrders() {
+        const { data } = await _supa.from('orders').select('*').order('id', {ascending: false});
+        if(data) document.getElementById('order-list').innerHTML = data.map(o => `
+            <div class="card" style="margin-bottom:10px; font-size:13px;">
+                <b>Order ID: #${o.id}</b> - <span style="color:red;">${o.total_price} Ks</span><br>
+                Type: ${o.order_type} | Status: ${o.status}<br>
+                <small>${o.created_at}</small>
+            </div>
+        `).join('');
+    }
+
+    function openEdit(p) {
+        nav('page-add');
+        document.getElementById('form-title').innerText = "ပြင်ဆင်ရန်";
+        document.getElementById('edit-id').value = p.id;
+        document.getElementById('p-name').value = p.name;
+        document.getElementById('p-retail').value = p.retail_price;
+        document.getElementById('p-wholesale').value = p.wholesale_price;
+        document.getElementById('p-moq').value = p.moq;
+        document.getElementById('p-cat').value = p.category;
+        currentImgUrl = p.image_url;
+        document.getElementById('p-img').src = p.image_url;
+        document.getElementById('p-img').style.display = 'block';
+        document.getElementById('pre-txt').style.display = 'none';
+        document.getElementById('btn-save').innerText = "Update ပြုလုပ်မည်";
+        document.getElementById('btn-cancel').style.display = "block";
+    }
+
+    function cancelEdit() { location.reload(); }
+
+    loadOrders();
+</script>
+</body>
+</html>
