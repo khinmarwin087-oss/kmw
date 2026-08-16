@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="my" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>စမတ် မဲစုကြေးစနစ် (Google Auth + Zoom Sync)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Padauk:wght@400;700&display=swap');
+        body { font-family: 'Padauk', sans-serif; }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        .gold-gradient-text {
+            background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+
+    <!-- FIREBASE SDKs (Auth & Firestore Included) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-16">
+
+    <!-- 1️⃣ STEP 1: GOOGLE LOGIN SCREEN (SHOWS FIRST) -->
+    <div id="login-view" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-3xl max-w-md w-full text-center space-y-6 shadow-2xl border border-amber-500/30">
+            <div class="w-20 h-20 bg-gradient-to-tr from-amber-500 to-amber-300 rounded-3xl flex items-center justify-center mx-auto text-slate-950 text-3xl font-black shadow-lg shadow-amber-500/20">
+                <i class="fa-solid fa-crown"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black gold-gradient-text">မဲစုကြေး စီမံခန့်ခွဲမှုစနစ်</h1>
+                <p class="text-xs text-slate-400 mt-2">စနစ်ကို စတင်အသုံးပြုရန် မိမိ၏ Google Account ဖြင့် အရင် Login ဝင်ပေးပါ။</p>
+            </div>
+            <button onclick="loginWithGoogle()" class="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm py-3.5 px-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl transition transform active:scale-95">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5" alt="Google">
+                <span>Sign in with Google</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2️⃣ STEP 2: MAIN APP SCREEN (HIDDEN UNTIL LOGGED IN) -->
+    <div id="app-view" class="hidden">
+        
+        <!-- TOP NAVIGATION BAR -->
+        <div class="bg-slate-900/90 border-b border-amber-500/20 sticky top-0 z-40 backdrop-blur-md shadow-2xl">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-400 p-0.5">
+                        <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-amber-400 text-lg">
+                            <i class="fa-solid fa-crown"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-amber-400/80 font-bold uppercase block">စုကြေးအကောင့်</span>
+                        <div class="flex items-center gap-2">
+                            <select id="account-select" onchange="switchAccount(this.value)" class="bg-slate-950 text-amber-300 text-xs font-bold px-3 py-1 rounded-xl border border-amber-500/40 focus:outline-none">
+                                <option value="">-- ရွေးချယ်ပါ --</option>
+                            </select>
+                            <div onclick="copyCurrentAccountId()" title="Copy ID" class="cursor-pointer bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded-lg font-mono font-bold border border-amber-500/30 flex items-center gap-1">
+                                <span id="disp-acc-id">ID: -</span>
+                                <i class="fa-solid fa-copy text-[10px]"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- USER PROFILE & LOGOUT -->
+                <div class="flex items-center gap-3">
+                    <button onclick="openJoinModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs px-3 py-1.5 rounded-xl font-bold">
+                        <i class="fa-solid fa-right-to-bracket text-amber-400"></i> ID ဖြင့်ဝင်မည်
+                    </button>
+                    <button onclick="openNewAccountModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs px-3 py-1.5 rounded-xl font-black">
+                        + အကောင့်အသစ်
+                    </button>
+
+                    <div class="h-6 w-[1px] bg-slate-800 mx-1"></div>
+
+                    <div class="flex items-center gap-2">
+                        <img id="user-photo" src="" class="w-8 h-8 rounded-full border border-amber-500/50" alt="User">
+                        <button onclick="logout()" class="text-rose-400 hover:text-rose-300 text-xs font-bold p-1" title="Logout ထွက်မည်">
+                            <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- APP CONTENT AREA -->
+        <div class="max-w-7xl mx-auto p-4 sm:p-6">
+            <div id="view-empty" class="max-w-md mx-auto my-16 p-8 glass-panel rounded-3xl shadow-2xl text-center space-y-4">
+                <div class="w-16 h-16 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl flex items-center justify-center mx-auto text-2xl">
+                    <i class="fa-solid fa-users-viewfinder"></i>
+                </div>
+                <h2 class="text-lg font-extrabold gold-gradient-text">စုကြေးအကောင့် မရှိသေးပါ</h2>
+                <p class="text-xs text-slate-400">အကောင့်အသစ် တည်ဆောက်ပါ သို့မဟုတ် တခြားသူ၏ Account ID ရိုက်ထည့်၍ ချိတ်ဆက်ပါ။</p>
+                <div class="space-y-2 pt-2">
+                    <button onclick="openJoinModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold border border-amber-500/40 text-xs py-2.5 rounded-xl">🔑 Account ID ဖြင့် ဝင်မည်</button>
+                    <button onclick="openNewAccountModal()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-2.5 rounded-xl">+ စုကြေးအကောင့်အသစ် တည်ဆောက်မည်</button>
+                </div>
+            </div>
+
+            <div id="main-app-content" class="hidden">
+                <div class="glass-panel p-5 rounded-3xl mb-6">
+                    <h1 id="disp-acc-name" class="text-xl font-black gold-gradient-text">-</h1>
+                    <p class="text-xs text-slate-400 mt-1">
+                        ၁ ရက်သွင်းငွေ: <b id="disp-amount" class="text-amber-300">၀</b> ကျပ် | 
+                        ရက်ခြား: <b id="disp-interval" class="text-amber-300">၀</b> ရက် | 
+                        စတင်ရက်: <b id="disp-start-date" class="text-amber-300">-</b>
+                    </p>
+                </div>
+                <!-- Turns/Dashboard data goes here -->
+                <div class="text-xs text-slate-400 text-center py-8">Google Login အောင်မြင်ပါပြီ။ အကောင့် ID များ Firebase ထဲသို့ Auto Sync ပြုလုပ်နေပါသည်။</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JOIN MODAL -->
+    <div id="join-account-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-amber-500/40 w-full max-w-md rounded-3xl p-6 space-y-4">
+            <h3 class="text-base font-extrabold gold-gradient-text">Account ID ဖြင့် ဝင်မည်</h3>
+            <input type="text" id="input-join-id" placeholder="ဥပမာ - 892-410" class="w-full p-3 text-center font-mono font-bold text-lg bg-slate-950 border border-slate-800 rounded-xl text-amber-400 uppercase">
+            <button onclick="submitJoinAccount()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-3 rounded-xl">ဝင်မည်</button>
+            <button onclick="closeJoinModal()" class="w-full text-slate-400 text-xs">မလုပ်တော့ပါ</button>
+        </div>
+    </div>
+
+    <!-- NEW ACCOUNT MODAL -->
+    <div id="new-account-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-amber-500/30 w-full max-w-md rounded-3xl p-6 space-y-3">
+            <h3 class="text-lg font-bold gold-gradient-text">အကောင့်အသစ် ဖွင့်ရန်</h3>
+            <div>
+                <label class="block text-xs font-bold text-amber-300 mb-1">အကောင့်အမည်</label>
+                <input type="text" id="new-acc-name" placeholder="ရွှေစုကြေး" class="w-full p-2.5 text-xs bg-slate-950 border border-slate-800 rounded-xl text-white">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-amber-300 mb-1">၁ ရက်လျှင် ၁ စာ ထည့်ဝင်ကြေး (ကျပ်)</label>
+                <input type="number" id="new-acc-amount" value="5000" class="w-full p-2.5 text-xs bg-slate-950 border border-slate-800 rounded-xl text-white">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-amber-300 mb-1">ရက်ခြား (ရက်)</label>
+                <input type="number" id="new-acc-interval" value="5" class="w-full p-2.5 text-xs bg-slate-950 border border-slate-800 rounded-xl text-white">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-amber-300 mb-1">စတင်မည့် ရက်စွဲ</label>
+                <input type="date" id="new-acc-startdate" class="w-full p-2.5 text-xs bg-slate-950 border border-slate-800 rounded-xl text-white">
+            </div>
+            <button onclick="submitCreateAccount()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-3 rounded-xl mt-3">တည်ဆောက်မည်</button>
+            <button onclick="closeNewAccountModal()" class="w-full text-slate-400 text-xs">မလုပ်တော့ပါ</button>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC WITH FIREBASE GOOGLE AUTH & FIRESTORE -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkzQP5GIabzQTUo9d9q98Ih0y1gDqFi7A",
+            authDomain: "tribleone-30cb8.firebaseapp.com",
+            projectId: "tribleone-30cb8",
+            storageBucket: "tribleone-30cb8.firebasestorage.app",
+            messagingSenderId: "880025708456",
+            appId: "1:880025708456:web:abebfc77ed6651279d9f9d",
+            measurementId: "G-TM9GBGVDL"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null;
+        let activeAccountId = null;
+        let accountsMap = {};
+
+        // 🟢 LISTEN TO AUTH STATE (LOGIN STATUS CHECK)
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('app-view').classList.remove('hidden');
+                document.getElementById('user-photo').src = user.photoURL || 'https://via.placeholder.com/150';
+
+                // Save/Update User Info to Firebase Firestore Users Collection
+                db.collection("users").doc(user.uid).set({
+                    uid: user.uid,
+                    name: user.displayName,
+                    email: user.email,
+                    photoURL: user.photoURL,
+                    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+
+                loadUserAccounts();
+            } else {
+                currentUser = null;
+                document.getElementById('login-view').classList.remove('hidden');
+                document.getElementById('app-view').classList.add('hidden');
+            }
+        });
+
+        // 🔑 GOOGLE LOGIN FUNCTION
+        function loginWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(error => {
+                alert("Login မအောင်မြင်ပါ: " + error.message);
+            });
+        }
+
+        // 🚪 LOGOUT FUNCTION
+        function logout() {
+            auth.signOut();
+        }
+
+        // 📂 LOAD ACCOUNTS FROM FIRESTORE
+        function loadUserAccounts() {
+            db.collection("rosca_accounts").onSnapshot(snapshot => {
+                accountsMap = {};
+                snapshot.forEach(doc => {
+                    accountsMap[doc.id] = doc.data();
+                });
+                renderApp();
+            });
+        }
+
+        function renderApp() {
+            const select = document.getElementById('account-select');
+            select.innerHTML = '';
+            const keys = Object.keys(accountsMap);
+
+            if (keys.length === 0) {
+                document.getElementById('view-empty').classList.remove('hidden');
+                document.getElementById('main-app-content').classList.add('hidden');
+                return;
+            }
+
+            if (!activeAccountId || !accountsMap[activeAccountId]) {
+                activeAccountId = keys[0];
+            }
+
+            keys.forEach(id => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = accountsMap[id].name;
+                if (id === activeAccountId) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            const acc = accountsMap[activeAccountId];
+            if (acc) {
+                document.getElementById('view-empty').classList.add('hidden');
+                document.getElementById('main-app-content').classList.remove('hidden');
+                document.getElementById('disp-acc-id').textContent = `ID: ${acc.id}`;
+                document.getElementById('disp-acc-name').textContent = acc.name;
+                document.getElementById('disp-amount').textContent = parseInt(acc.amount).toLocaleString();
+                document.getElementById('disp-interval').textContent = acc.interval;
+                document.getElementById('disp-start-date').textContent = acc.startDate;
+            }
+        }
+
+        function switchAccount(accId) {
+            activeAccountId = accId;
+            renderApp();
+        }
+
+        function submitCreateAccount() {
+            const name = document.getElementById('new-acc-name').value.trim();
+            const amount = document.getElementById('new-acc-amount').value;
+            const interval = document.getElementById('new-acc-interval').value;
+            const startDate = document.getElementById('new-acc-startdate').value;
+
+            if (!name || !amount || !interval || !startDate) return alert('အချက်အလက်ပြည့်စုံစွာ ဖြည့်ပါ');
+
+            const accId = `${Math.floor(100+Math.random()*900)}-${Math.floor(100+Math.random()*900)}`;
+            const newAcc = {
+                id: accId,
+                name,
+                amount,
+                interval,
+                startDate,
+                createdBy: currentUser.uid,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            // Save Account to Firebase Firestore
+            db.collection("rosca_accounts").doc(accId).set(newAcc).then(() => {
+                activeAccountId = accId;
+                closeNewAccountModal();
+            });
+        }
+
+        function submitJoinAccount() {
+            const inputId = document.getElementById('input-join-id').value.trim();
+            if (!inputId) return;
+
+            db.collection("rosca_accounts").doc(inputId).get().then(doc => {
+                if (doc.exists) {
+                    activeAccountId = inputId;
+                    closeJoinModal();
+                    renderApp();
+                } else {
+                    alert('Account ID ရှာမတွေ့ပါ');
+                }
+            });
+        }
+
+        function copyCurrentAccountId() {
+            if (activeAccountId) {
+                navigator.clipboard.writeText(activeAccountId);
+                alert(`Account ID (${activeAccountId}) ကို Copy ယူပြီးပါပြီ။`);
+            }
+        }
+
+        function openJoinModal() { document.getElementById('join-account-modal').classList.replace('hidden', 'flex'); }
+        function closeJoinModal() { document.getElementById('join-account-modal').classList.replace('flex', 'hidden'); }
+        function openNewAccountModal() { 
+            document.getElementById('new-acc-startdate').valueAsDate = new Date();
+            document.getElementById('new-account-modal').classList.replace('hidden', 'flex'); 
+        }
+        function closeNewAccountModal() { document.getElementById('new-account-modal').classList.replace('flex', 'hidden'); }
+    </script>
+</body>
+</html>
