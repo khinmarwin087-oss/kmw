@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>စမတ် မဲစုကြေးစနစ် (Google Auth + Zoom Sync)</title>
+    <title>စမတ် မဲစုကြေးစနစ်</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -21,14 +21,14 @@
         }
     </style>
 
-    <!-- FIREBASE SDKs (Auth & Firestore Included) -->
+    <!-- FIREBASE SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-16">
 
-    <!-- 1️⃣ STEP 1: GOOGLE LOGIN SCREEN (SHOWS FIRST) -->
+    <!-- 1️⃣ STEP 1: GOOGLE LOGIN SCREEN -->
     <div id="login-view" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
         <div class="glass-panel p-8 rounded-3xl max-w-md w-full text-center space-y-6 shadow-2xl border border-amber-500/30">
             <div class="w-20 h-20 bg-gradient-to-tr from-amber-500 to-amber-300 rounded-3xl flex items-center justify-center mx-auto text-slate-950 text-3xl font-black shadow-lg shadow-amber-500/20">
@@ -45,7 +45,7 @@
         </div>
     </div>
 
-    <!-- 2️⃣ STEP 2: MAIN APP SCREEN (HIDDEN UNTIL LOGGED IN) -->
+    <!-- 2️⃣ STEP 2: MAIN APP SCREEN -->
     <div id="app-view" class="hidden">
         
         <!-- TOP NAVIGATION BAR -->
@@ -71,7 +71,6 @@
                     </div>
                 </div>
 
-                <!-- USER PROFILE & LOGOUT -->
                 <div class="flex items-center gap-3">
                     <button onclick="openJoinModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs px-3 py-1.5 rounded-xl font-bold">
                         <i class="fa-solid fa-right-to-bracket text-amber-400"></i> ID ဖြင့်ဝင်မည်
@@ -79,9 +78,7 @@
                     <button onclick="openNewAccountModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs px-3 py-1.5 rounded-xl font-black">
                         + အကောင့်အသစ်
                     </button>
-
                     <div class="h-6 w-[1px] bg-slate-800 mx-1"></div>
-
                     <div class="flex items-center gap-2">
                         <img id="user-photo" src="" class="w-8 h-8 rounded-full border border-amber-500/50" alt="User">
                         <button onclick="logout()" class="text-rose-400 hover:text-rose-300 text-xs font-bold p-1" title="Logout ထွက်မည်">
@@ -92,7 +89,7 @@
             </div>
         </div>
 
-        <!-- APP CONTENT AREA -->
+        <!-- MAIN DASHBOARD CONTENT -->
         <div class="max-w-7xl mx-auto p-4 sm:p-6">
             <div id="view-empty" class="max-w-md mx-auto my-16 p-8 glass-panel rounded-3xl shadow-2xl text-center space-y-4">
                 <div class="w-16 h-16 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl flex items-center justify-center mx-auto text-2xl">
@@ -106,23 +103,85 @@
                 </div>
             </div>
 
-            <div id="main-app-content" class="hidden">
-                <div class="glass-panel p-5 rounded-3xl mb-6">
-                    <h1 id="disp-acc-name" class="text-xl font-black gold-gradient-text">-</h1>
-                    <p class="text-xs text-slate-400 mt-1">
-                        ၁ ရက်သွင်းငွေ: <b id="disp-amount" class="text-amber-300">၀</b> ကျပ် | 
-                        ရက်ခြား: <b id="disp-interval" class="text-amber-300">၀</b> ရက် | 
-                        စတင်ရက်: <b id="disp-start-date" class="text-amber-300">-</b>
-                    </p>
+            <!-- ACTIVE DASHBOARD -->
+            <div id="main-app-content" class="hidden space-y-6">
+                <!-- ACCOUNT INFO HEADER -->
+                <div class="glass-panel p-5 rounded-3xl flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                        <h1 id="disp-acc-name" class="text-xl font-black gold-gradient-text">-</h1>
+                        <p class="text-xs text-slate-400 mt-1">
+                            ၁ ရက်သွင်းငွေ: <b id="disp-amount" class="text-amber-300">၀</b> ကျပ် | 
+                            ရက်ခြား: <b id="disp-interval" class="text-amber-300">၀</b> ရက် | 
+                            စတင်ရက်: <b id="disp-start-date" class="text-amber-300">-</b>
+                        </p>
+                    </div>
+                    <button onclick="openAddMemberModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2">
+                        <i class="fa-solid fa-user-plus"></i> အသင်းဝင်အသစ်ထည့်မည်
+                    </button>
                 </div>
-                <!-- Turns/Dashboard data goes here -->
-                <div class="text-xs text-slate-400 text-center py-8">Google Login အောင်မြင်ပါပြီ။ အကောင့် ID များ Firebase ထဲသို့ Auto Sync ပြုလုပ်နေပါသည်။</div>
+
+                <!-- STATS SUMMARY -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="glass-panel p-4 rounded-2xl border-l-4 border-amber-500">
+                        <span class="text-xs text-slate-400 font-bold block">စုစုပေါင်း အသင်းဝင်</span>
+                        <span id="stat-total-members" class="text-2xl font-black text-amber-400">0</span>
+                    </div>
+                    <div class="glass-panel p-4 rounded-2xl border-l-4 border-emerald-500">
+                        <span class="text-xs text-slate-400 font-bold block">မဲပေါက်ပြီးသူ</span>
+                        <span id="stat-won-members" class="text-2xl font-black text-emerald-400">0</span>
+                    </div>
+                    <div class="glass-panel p-4 rounded-2xl border-l-4 border-sky-500">
+                        <span class="text-xs text-slate-400 font-bold block">မဲမပေါက်သေးသူ</span>
+                        <span id="stat-pending-members" class="text-2xl font-black text-sky-400">0</span>
+                    </div>
+                </div>
+
+                <!-- MEMBER LIST TABLE -->
+                <div class="glass-panel rounded-3xl overflow-hidden p-5">
+                    <h3 class="text-sm font-bold text-amber-300 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-users"></i> အသင်းဝင်များ စာရင်း
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-900/80 text-amber-400 font-bold border-b border-amber-500/20">
+                                <tr>
+                                    <th class="p-3">#</th>
+                                    <th class="p-3">အမည်</th>
+                                    <th class="p-3">ဖုန်းနံပါတ်</th>
+                                    <th class="p-3">အခြေအနေ</th>
+                                    <th class="p-3 text-right">လုပ်ဆောင်ချက်</th>
+                                </tr>
+                            </thead>
+                            <tbody id="member-table-body" class="divide-y divide-slate-800">
+                                <tr>
+                                    <td colspan="5" class="p-4 text-center text-slate-500">အသင်းဝင် စာရင်းမရှိသေးပါ။</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
-
     </div>
 
-    <!-- JOIN MODAL -->
+    <!-- ADD MEMBER MODAL -->
+    <div id="add-member-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-amber-500/30 w-full max-w-md rounded-3xl p-6 space-y-3">
+            <h3 class="text-lg font-bold gold-gradient-text">အသင်းဝင်အသစ် ထည့်သွင်းရန်</h3>
+            <div>
+                <label class="block text-xs font-bold text-amber-300 mb-1">အသင်းဝင် အမည်</label>
+                <input type="text" id="member-name" placeholder="ဦးဘ" class="w-full p-2.5 text-xs bg-slate-950 border border-slate-800 rounded-xl text-white">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-amber-300 mb-1">ဖုန်းနံပါတ်</label>
+                <input type="text" id="member-phone" placeholder="09xxxxxxxxx" class="w-full p-2.5 text-xs bg-slate-950 border border-slate-800 rounded-xl text-white">
+            </div>
+            <button onclick="submitAddMember()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-3 rounded-xl mt-3">သိမ်းဆည်းမည်</button>
+            <button onclick="closeAddMemberModal()" class="w-full text-slate-400 text-xs">မလုပ်တော့ပါ</button>
+        </div>
+    </div>
+
+    <!-- JOIN ACC MODAL -->
     <div id="join-account-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden items-center justify-center p-4 z-50">
         <div class="bg-slate-900 border border-amber-500/40 w-full max-w-md rounded-3xl p-6 space-y-4">
             <h3 class="text-base font-extrabold gold-gradient-text">Account ID ဖြင့် ဝင်မည်</h3>
@@ -132,7 +191,7 @@
         </div>
     </div>
 
-    <!-- NEW ACCOUNT MODAL -->
+    <!-- NEW ACC MODAL -->
     <div id="new-account-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
         <div class="bg-slate-900 border border-amber-500/30 w-full max-w-md rounded-3xl p-6 space-y-3">
             <h3 class="text-lg font-bold gold-gradient-text">အကောင့်အသစ် ဖွင့်ရန်</h3>
@@ -157,7 +216,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT LOGIC WITH FIREBASE GOOGLE AUTH & FIRESTORE -->
+    <!-- JAVASCRIPT LOGIC -->
     <script>
         const firebaseConfig = {
             apiKey: "AIzaSyCkzQP5GIabzQTUo9d9q98Ih0y1gDqFi7A",
@@ -177,7 +236,6 @@
         let activeAccountId = null;
         let accountsMap = {};
 
-        // 🟢 LISTEN TO AUTH STATE (LOGIN STATUS CHECK)
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
@@ -185,7 +243,6 @@
                 document.getElementById('app-view').classList.remove('hidden');
                 document.getElementById('user-photo').src = user.photoURL || 'https://via.placeholder.com/150';
 
-                // Save/Update User Info to Firebase Firestore Users Collection
                 db.collection("users").doc(user.uid).set({
                     uid: user.uid,
                     name: user.displayName,
@@ -202,26 +259,17 @@
             }
         });
 
-        // 🔑 GOOGLE LOGIN FUNCTION
         function loginWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(error => {
-                alert("Login မအောင်မြင်ပါ: " + error.message);
-            });
+            auth.signInWithPopup(provider).catch(err => alert("Login Error: " + err.message));
         }
 
-        // 🚪 LOGOUT FUNCTION
-        function logout() {
-            auth.signOut();
-        }
+        function logout() { auth.signOut(); }
 
-        // 📂 LOAD ACCOUNTS FROM FIRESTORE
         function loadUserAccounts() {
             db.collection("rosca_accounts").onSnapshot(snapshot => {
                 accountsMap = {};
-                snapshot.forEach(doc => {
-                    accountsMap[doc.id] = doc.data();
-                });
+                snapshot.forEach(doc => { accountsMap[doc.id] = doc.data(); });
                 renderApp();
             });
         }
@@ -258,13 +306,79 @@
                 document.getElementById('disp-amount').textContent = parseInt(acc.amount).toLocaleString();
                 document.getElementById('disp-interval').textContent = acc.interval;
                 document.getElementById('disp-start-date').textContent = acc.startDate;
+
+                loadMembers(acc.id);
             }
         }
 
-        function switchAccount(accId) {
-            activeAccountId = accId;
-            renderApp();
+        function loadMembers(accId) {
+            db.collection("rosca_accounts").doc(accId).collection("members").onSnapshot(snapshot => {
+                const tbody = document.getElementById('member-table-body');
+                tbody.innerHTML = '';
+
+                let total = 0, won = 0, pending = 0;
+
+                if (snapshot.empty) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">အသင်းဝင် စာရင်းမရှိသေးပါ။</td></tr>`;
+                } else {
+                    let index = 1;
+                    snapshot.forEach(doc => {
+                        const m = doc.data();
+                        total++;
+                        if (m.hasWon) won++; else pending++;
+
+                        const tr = document.createElement('tr');
+                        tr.className = "hover:bg-slate-900/50 transition";
+                        tr.innerHTML = `
+                            <td class="p-3 font-mono">${index++}</td>
+                            <td class="p-3 font-bold text-white">${m.name}</td>
+                            <td class="p-3 text-slate-400 font-mono">${m.phone || '-'}</td>
+                            <td class="p-3">
+                                ${m.hasWon 
+                                    ? '<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-md text-[10px] font-bold">မဲပေါက်ပြီး</span>' 
+                                    : '<span class="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-md text-[10px] font-bold">မပေါက်သေး</span>'}
+                            </td>
+                            <td class="p-3 text-right">
+                                <button onclick="toggleMemberStatus('${doc.id}', ${!m.hasWon})" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-300 px-2 py-1 rounded-lg border border-amber-500/20">
+                                    ${m.hasWon ? 'မဲမပေါက်သေး ပြောင်းမည်' : 'မဲပေါက်သူ အဖြစ်သတ်မှတ်မည်'}
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                document.getElementById('stat-total-members').textContent = total;
+                document.getElementById('stat-won-members').textContent = won;
+                document.getElementById('stat-pending-members').textContent = pending;
+            });
         }
+
+        function submitAddMember() {
+            const name = document.getElementById('member-name').value.trim();
+            const phone = document.getElementById('member-phone').value.trim();
+
+            if (!name) return alert('အသင်းဝင်အမည် ဖြည့်ပါ');
+
+            db.collection("rosca_accounts").doc(activeAccountId).collection("members").add({
+                name,
+                phone,
+                hasWon: false,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                document.getElementById('member-name').value = '';
+                document.getElementById('member-phone').value = '';
+                closeAddMemberModal();
+            });
+        }
+
+        function toggleMemberStatus(memberId, hasWon) {
+            db.collection("rosca_accounts").doc(activeAccountId).collection("members").doc(memberId).update({
+                hasWon: hasWon
+            });
+        }
+
+        function switchAccount(accId) { activeAccountId = accId; renderApp(); }
 
         function submitCreateAccount() {
             const name = document.getElementById('new-acc-name').value.trim();
@@ -272,21 +386,14 @@
             const interval = document.getElementById('new-acc-interval').value;
             const startDate = document.getElementById('new-acc-startdate').value;
 
-            if (!name || !amount || !interval || !startDate) return alert('အချက်အလက်ပြည့်စုံစွာ ဖြည့်ပါ');
+            if (!name || !amount || !interval || !startDate) return alert('အချက်အလက်ဖြည့်ပါ');
 
             const accId = `${Math.floor(100+Math.random()*900)}-${Math.floor(100+Math.random()*900)}`;
-            const newAcc = {
-                id: accId,
-                name,
-                amount,
-                interval,
-                startDate,
+            db.collection("rosca_accounts").doc(accId).set({
+                id: accId, name, amount, interval, startDate,
                 createdBy: currentUser.uid,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-
-            // Save Account to Firebase Firestore
-            db.collection("rosca_accounts").doc(accId).set(newAcc).then(() => {
+            }).then(() => {
                 activeAccountId = accId;
                 closeNewAccountModal();
             });
@@ -295,15 +402,12 @@
         function submitJoinAccount() {
             const inputId = document.getElementById('input-join-id').value.trim();
             if (!inputId) return;
-
             db.collection("rosca_accounts").doc(inputId).get().then(doc => {
                 if (doc.exists) {
                     activeAccountId = inputId;
                     closeJoinModal();
                     renderApp();
-                } else {
-                    alert('Account ID ရှာမတွေ့ပါ');
-                }
+                } else alert('Account ID ရှာမတွေ့ပါ');
             });
         }
 
@@ -314,6 +418,8 @@
             }
         }
 
+        function openAddMemberModal() { document.getElementById('add-member-modal').classList.replace('hidden', 'flex'); }
+        function closeAddMemberModal() { document.getElementById('add-member-modal').classList.replace('flex', 'hidden'); }
         function openJoinModal() { document.getElementById('join-account-modal').classList.replace('hidden', 'flex'); }
         function closeJoinModal() { document.getElementById('join-account-modal').classList.replace('flex', 'hidden'); }
         function openNewAccountModal() { 
