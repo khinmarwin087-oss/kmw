@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="my" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>စမတ် မဲစုကြေး ကြည့်ရှုရန် (Member View)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Padauk:wght@400;700&display=swap');
+        body { font-family: 'Padauk', sans-serif; }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        .gold-gradient-text {
+            background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .emerald-card {
+            background: linear-gradient(135deg, rgba(6, 78, 59, 0.6) 0%, rgba(15, 23, 42, 0.9) 100%);
+        }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-16 selection:bg-amber-500 selection:text-slate-950">
+
+    <!-- Step 1: Login View -->
+    <div id="login-view" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-3xl max-w-md w-full text-center space-y-6 shadow-2xl border border-amber-500/30">
+            <div class="w-20 h-20 bg-gradient-to-tr from-amber-500 to-amber-300 rounded-3xl flex items-center justify-center mx-auto text-slate-950 text-3xl font-black shadow-lg shadow-amber-500/20">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black gold-gradient-text">မဲစုကြေး အဖွဲ့ဝင်များ စနစ်</h1>
+                <p class="text-xs text-slate-400 mt-2">စနစ်ကို စတင်ကြည့်ရှုရန် မိမိ၏ Google Account ဖြင့် Login ဝင်ပေးပါ။</p>
+            </div>
+            <button onclick="loginWithGoogle()" class="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm py-3.5 px-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl transition transform active:scale-95">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5" alt="Google">
+                <span>Sign in with Google</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- App View Wrapper -->
+    <div id="app-view" class="hidden">
+        
+        <!-- Navbar Header -->
+        <div class="bg-slate-900/90 border-b border-amber-500/20 sticky top-0 z-40 backdrop-blur-md shadow-2xl">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-400 p-0.5 shadow-lg shadow-amber-500/20">
+                        <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-amber-400 text-lg">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-amber-400/80 font-bold uppercase tracking-wider block">မဲစုကြေး အဖွဲ့ဝင်စနစ်</span>
+                        <div class="text-xs font-bold text-slate-200" id="nav-acc-id-display">
+                            ID: မချိတ်ဆက်ရသေးပါ
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button id="btn-change-acc" onclick="openJoinModal()" class="hidden bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-key text-amber-400"></i> Account ID ပြောင်းမည်
+                    </button>
+                    <div class="h-6 w-[1px] bg-slate-800"></div>
+                    <div class="flex items-center gap-2">
+                        <img id="user-photo" src="" class="w-8 h-8 rounded-full border border-amber-500/50" alt="User">
+                        <button onclick="logout()" class="text-rose-400 hover:text-rose-300 text-xs font-bold p-1" title="Logout ထွက်မည်">
+                            <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Empty State (Ask for Account ID first) -->
+        <div id="view-empty" class="max-w-md mx-auto my-16 p-8 glass-panel rounded-3xl shadow-2xl text-center space-y-5">
+            <div class="w-20 h-20 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-3xl flex items-center justify-center mx-auto text-3xl font-bold shadow-inner">
+                <i class="fa-solid fa-key"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-extrabold gold-gradient-text">Account ID ရိုက်ထည့်ပါ</h2>
+                <p class="text-xs text-slate-400 mt-2">ဒိုင်မှ ပေးထားသော မဲစုကြေး **Account ID** ကို ရိုက်ထည့်၍ ချိတ်ဆက်ကြည့်ရှုပါ</p>
+            </div>
+
+            <div class="space-y-3 pt-2">
+                <input type="text" id="empty-input-acc-id" placeholder="ဥပမာ - 892-410" class="w-full p-3.5 text-center font-mono font-bold tracking-widest text-lg bg-slate-950 border border-amber-500/40 rounded-2xl text-amber-400 uppercase focus:outline-none focus:border-amber-400 shadow-inner">
+                <button onclick="connectWithInputId()" class="w-full bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-sm py-3.5 rounded-2xl shadow-lg shadow-amber-500/20 transition transform active:scale-95">
+                    ချိတ်ဆက်ကြည့်ရှုမည်
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 3: Main App Content (Shows only after Account ID is connected) -->
+        <div id="main-app-content" class="max-w-7xl mx-auto p-4 sm:p-6 hidden">
+
+            <header class="glass-panel p-5 rounded-3xl shadow-2xl mb-6 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 id="disp-acc-name" class="text-2xl font-black gold-gradient-text">-</h1>
+                        <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold px-2.5 py-0.5 rounded-full">Live Cloud Sync</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">
+                        ၁ ရက်သွင်းငွေ: <b id="disp-amount" class="text-amber-300">၀</b> ကျပ် | 
+                        မဲထုတ်ရက်: <b id="disp-interval" class="text-amber-300">၀</b> ရက်တစ်ခါ | 
+                        စတင်ရက်: <b id="disp-start-date" class="text-amber-300">-</b>
+                    </p>
+                </div>
+            </header>
+
+            <!-- Hero Active Turn Banner -->
+            <div id="active-turn-banner" class="mb-6 emerald-card rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden border border-emerald-500/30">
+                <div class="relative z-10 flex flex-wrap justify-between items-center gap-6">
+                    <div class="space-y-2 max-w-lg">
+                        <div class="flex items-center gap-2">
+                            <span id="hero-turn-no" class="bg-amber-400 text-slate-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">
+                                လက်ရှိ မဲအလှည့် #--
+                            </span>
+                            <span id="hero-days-left" class="bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-xs px-3 py-1 rounded-full font-bold">
+                                -
+                            </span>
+                        </div>
+                        
+                        <div class="pt-1">
+                            <p class="text-[10px] text-emerald-300 font-bold uppercase tracking-wider">ယခုအလှည့် မဲပေါက်သူ / ထုတ်ယူမည့်သူ</p>
+                            <h2 id="hero-member-name" class="text-3xl font-black text-white tracking-tight mt-0.5">-</h2>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-4 text-xs pt-1">
+                            <div>
+                                <span class="text-slate-300">ရရှိမည့် မဲဆုငွေ:</span>
+                                <span id="hero-payout-amount" class="text-amber-300 font-black text-base ml-1">0 ကျပ်</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-300">ထုတ်ယူရမည့်ရက်:</span>
+                                <span id="hero-payout-date" class="text-white font-bold ml-1">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950/60 backdrop-blur-md p-4 rounded-2xl border border-emerald-500/30 w-full sm:w-auto min-w-[240px] space-y-2">
+                        <div class="flex items-center gap-2 text-amber-400 text-xs font-bold">
+                            <i class="fa-solid fa-forward"></i>
+                            <span>နောက်တစ်လှည့် မဲထုတ်ယူမည့်သူ (Next)</span>
+                        </div>
+                        <div id="hero-next-name" class="text-base font-bold text-white">-</div>
+                        <div class="text-xs text-slate-400 flex justify-between items-center">
+                            <span>မဲထုတ်ရမည့်ရက်:</span>
+                            <b id="hero-next-date" class="text-emerald-400 font-mono">-</b>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overview Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="glass-panel p-4 rounded-2xl shadow border-l-4 border-emerald-500 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">စုစုပေါင်း ရရှိပြီးငွေ</p>
+                        <p id="card-total-collected" class="text-lg font-black text-emerald-400">0 ကျပ်</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                </div>
+                <div class="glass-panel p-4 rounded-2xl shadow border-l-4 border-rose-500 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">ကောက်ခံရန် ကျန်ငွေ</p>
+                        <p id="card-total-pending" class="text-lg font-black text-rose-400">0 ကျပ်</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-hand-holding-dollar"></i>
+                    </div>
+                </div>
+                <div class="glass-panel p-4 rounded-2xl shadow border-l-4 border-amber-500 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">အဖွဲ့ဝင် / အစု စုစုပေါင်း</p>
+                        <p id="card-total-shares" class="text-lg font-black text-amber-400">0 ဦး (0 စာ)</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+                <div class="glass-panel p-4 rounded-2xl shadow border-l-4 border-purple-500 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] text-slate-400 font-bold">အလှည့် ပြီးစီးမှု</p>
+                        <p id="card-progress-percent" class="text-lg font-black text-purple-400">0%</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex gap-2 mb-6 border-b border-slate-800 pb-2 overflow-x-auto">
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-grid-2 mr-1"></i> မဲအလှည့် ကဒ်များ
+                </button>
+                <button onclick="switchTab('members')" id="tab-members" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-300 border border-slate-800">
+                    <i class="fa-solid fa-users mr-1"></i> အဖွဲ့ဝင်များ စာရင်း
+                </button>
+                <button onclick="switchTab('audit')" id="tab-audit" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-300 border border-slate-800">
+                    <i class="fa-solid fa-user-check mr-1"></i> တစ်ဦးချင်း စစ်ဆေးရန်
+                </button>
+            </div>
+
+            <!-- Tab 1: Dashboard -->
+            <div id="view-dashboard" class="tab-content">
+                <div class="glass-panel p-4 rounded-2xl shadow mb-4 flex flex-wrap gap-3 justify-between items-center">
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <div class="relative w-full sm:w-64">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-500"></i>
+                            <input type="text" id="search-input" onkeyup="renderDashboardCardsGrid()" placeholder="အမည်ဖြင့် ရှာရန်..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-white">
+                        </div>
+                        <select id="status-filter" onchange="renderDashboardCardsGrid()" class="text-xs p-2 bg-slate-950 border border-slate-800 rounded-xl font-bold text-amber-300">
+                            <option value="all">အလှည့် အားလုံး</option>
+                            <option value="pending">မထုတ်ယူရသေးသူများ</option>
+                            <option value="taken">ထုတ်ယူပြီးသူများ</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="dashboard-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+
+            <!-- Tab 2: Members -->
+            <div id="view-members" class="tab-content hidden">
+                <div class="glass-panel p-4 rounded-2xl shadow mb-6">
+                    <h2 class="font-bold text-sm text-amber-300">အဖွဲ့ဝင်များ စာရင်း</h2>
+                </div>
+                <div class="glass-panel rounded-2xl shadow overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-950 text-slate-400 text-xs uppercase border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">အမည်</th>
+                                <th class="p-3">ဖုန်းနံပါတ်</th>
+                                <th class="p-3 text-center">ဝယ်ယူထားသော အစု</th>
+                            </tr>
+                        </thead>
+                        <tbody id="members-table-body" class="divide-y divide-slate-800"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Member Audit -->
+            <div id="view-audit" class="tab-content hidden">
+                <div class="glass-panel p-4 rounded-2xl shadow mb-6">
+                    <label class="block text-xs font-bold text-amber-300 mb-2">စစ်ဆေးလိုသည့် အဖွဲ့ဝင် ရွေးပါ:</label>
+                    <select id="audit-member-select" onchange="renderMemberAuditDetails()" class="bg-slate-950 border border-slate-800 text-xs rounded-xl p-2.5 w-full max-w-sm text-white font-bold"></select>
+                </div>
+                <div id="audit-details-box" class="space-y-4"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Account ID Change Modal -->
+    <div id="join-account-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-amber-500/40 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-extrabold gold-gradient-text"><i class="fa-solid fa-key mr-2"></i> Account ID ပြောင်းမည်</h3>
+                <button onclick="closeJoinModal()"><i class="fa-solid fa-xmark text-slate-400"></i></button>
+            </div>
+            <p class="text-xs text-slate-400">အခြား မဲစုကြေး Account ID ကို ရိုက်ထည့်ပါ:</p>
+            <div>
+                <label class="block text-xs font-bold text-amber-300 mb-1">Account ID</label>
+                <input type="text" id="input-join-id" placeholder="892-410" class="w-full p-3 text-center font-mono font-bold tracking-widest text-lg bg-slate-950 border border-slate-800 rounded-xl text-amber-400 uppercase focus:outline-none focus:border-amber-500">
+            </div>
+            <button onclick="submitJoinAccount()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow">
+                အကောင့်သို့ ဝင်မည်
+            </button>
+        </div>
+    </div>
+
+    <!-- Payment Detail Modal -->
+    <div id="payment-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-amber-500/30 w-full max-w-2xl rounded-3xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+            
+            <div class="flex justify-between items-start mb-5 border-b border-slate-800 pb-4">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span id="modal-turn-badge" class="bg-amber-500 text-slate-950 font-black text-xs px-3 py-1 rounded-full uppercase">မဲအလှည့် #-</span>
+                    </div>
+                    <h3 id="pay-modal-title" class="text-2xl font-black gold-gradient-text mt-2">-</h3>
+                    <p id="pay-modal-subtitle" class="text-xs text-slate-400 mt-0.5"></p>
+                </div>
+                <button onclick="closePaymentModal()" class="text-slate-400 hover:text-white text-2xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                <div class="bg-slate-950 p-3.5 rounded-2xl border border-amber-500/30 text-center">
+                    <p class="text-[11px] text-amber-400/80 font-bold">ထုတ်ယူမည့် မဲဆုငွေ</p>
+                    <p id="modal-payout-amt" class="text-lg font-black text-amber-300">0 ကျပ်</p>
+                    <p id="modal-payout-status" class="text-[10px] font-bold mt-1 text-purple-400">-</p>
+                </div>
+                <div class="bg-slate-950 p-3.5 rounded-2xl border border-emerald-500/30 text-center">
+                    <p class="text-[11px] text-emerald-400/80 font-bold">ကောက်ခံရရှိပြီးငွေ</p>
+                    <p id="modal-paid-amt" class="text-lg font-black text-emerald-400">0 ကျပ်</p>
+                    <p id="modal-paid-count" class="text-[10px] text-slate-400">(0 / 0 စာ ပေးပြီး)</p>
+                </div>
+                <div class="bg-slate-950 p-3.5 rounded-2xl border border-rose-500/30 text-center">
+                    <p class="text-[11px] text-rose-400/80 font-bold">ပေးရန် ကျန်ငွေ</p>
+                    <p id="modal-pending-amt" class="text-lg font-black text-rose-400">0 ကျပ်</p>
+                    <p id="modal-pending-count" class="text-[10px] text-slate-400">(0 / 0 စာ ကျန်)</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="border rounded-2xl p-3 bg-slate-950/80 border-rose-500/30">
+                    <h4 class="text-xs font-bold text-rose-400 mb-2.5 flex justify-between items-center">
+                        <span><i class="fa-solid fa-clock text-rose-500 mr-1"></i> ပေးရန်ကျန်သေးသူများ</span>
+                        <span id="badge-unpaid-count" class="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full text-[10px]">0</span>
+                    </h4>
+                    <div id="payment-list-unpaid" class="space-y-2 max-h-56 overflow-y-auto"></div>
+                </div>
+
+                <div class="border rounded-2xl p-3 bg-slate-950/80 border-emerald-500/30">
+                    <h4 class="text-xs font-bold text-emerald-400 mb-2.5 flex justify-between items-center">
+                        <span><i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> ပေးပြီးသူများ</span>
+                        <span id="badge-paid-count" class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full text-[10px]">0</span>
+                    </h4>
+                    <div id="payment-list-paid" class="space-y-2 max-h-56 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <div class="mt-6 text-right">
+                <button onclick="closePaymentModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-5 py-2.5 rounded-xl font-bold border border-slate-700">
+                    ပိတ်မည်
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkzQP5GIabzQTUo9d9q98Ih0y1gDqFi7A",
+            authDomain: "tribleone-30cb8.firebaseapp.com",
+            projectId: "tribleone-30cb8",
+            storageBucket: "tribleone-30cb8.firebasestorage.app",
+            messagingSenderId: "880025708456",
+            appId: "1:880025708456:web:abebfc77ed6651279d9f9d",
+            measurementId: "G-TM9GBGVDL"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null;
+        let activeAccountId = null;
+        let currentAccountData = null;
+        let unsubscribeFirestore = null;
+        let currentSelectedTurnNo = null;
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('app-view').classList.remove('hidden');
+                document.getElementById('user-photo').src = user.photoURL || 'https://via.placeholder.com/150';
+
+                // reset view on initial login
+                renderApp();
+            } else {
+                currentUser = null;
+                activeAccountId = null;
+                currentAccountData = null;
+                if(unsubscribeFirestore) unsubscribeFirestore();
+                document.getElementById('login-view').classList.remove('hidden');
+                document.getElementById('app-view').classList.add('hidden');
+            }
+        });
+
+        function loginWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(err => alert("Login Error: " + err.message));
+        }
+
+        function logout() { auth.signOut(); }
+
+        function connectWithInputId() {
+            const inputId = document.getElementById('empty-input-acc-id').value.trim().toUpperCase();
+            if (!inputId) {
+                alert("ကျေးဇူးပြု၍ Account ID ရိုက်ထည့်ပါ");
+                return;
+            }
+            connectToAccount(inputId);
+        }
+
+        function connectToAccount(accId) {
+            if (!accId) return;
+            const targetId = accId.trim().toUpperCase();
+
+            if (unsubscribeFirestore) unsubscribeFirestore();
+
+            // Realtime Listening from Firestore
+            unsubscribeFirestore = db.collection("rosca_accounts").doc(targetId)
+                .onSnapshot(doc => {
+                    if (doc.exists) {
+                        activeAccountId = targetId;
+                        currentAccountData = doc.data();
+                        renderApp();
+                    } else {
+                        alert("Account ID (" + targetId + ") ရှာမတွေ့ပါ။ ဒိုင်ပေးထားသော ID မှန်ကန်ကြောင်း ပြန်စစ်ပေးပါ။");
+                    }
+                }, err => {
+                    alert("အချက်အလက် ရယူရာတွင် အမှားတစ်ခု ဖြစ်ပေါ်နေပါသည်: " + err.message);
+                });
+        }
+
+        function renderApp() {
+            const emptyView = document.getElementById('view-empty');
+            const mainContent = document.getElementById('main-app-content');
+            const navAccDisplay = document.getElementById('nav-acc-id-display');
+            const btnChangeAcc = document.getElementById('btn-change-acc');
+
+            if (!activeAccountId || !currentAccountData) {
+                emptyView.classList.remove('hidden');
+                mainContent.classList.add('hidden');
+                btnChangeAcc.classList.add('hidden');
+                navAccDisplay.textContent = `ID: မချိတ်ဆက်ရသေးပါ`;
+                return;
+            }
+
+            emptyView.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+            btnChangeAcc.classList.remove('hidden');
+
+            navAccDisplay.textContent = `ID: ${activeAccountId}`;
+            document.getElementById('disp-acc-name').textContent = currentAccountData.name;
+            document.getElementById('disp-amount').textContent = parseInt(currentAccountData.amount).toLocaleString();
+            document.getElementById('disp-interval').textContent = currentAccountData.interval;
+            document.getElementById('disp-start-date').textContent = currentAccountData.startDate;
+
+            renderActiveTurnHeroBanner(currentAccountData);
+            renderDashboardOverviewCards(currentAccountData);
+            renderDashboardCardsGrid();
+            renderMembersTable();
+            renderAuditSelect();
+        }
+      function renderActiveTurnHeroBanner(acc) {
+            if (!acc || !acc.turns || acc.turns.length === 0) {
+                document.getElementById('active-turn-banner').classList.add('hidden');
+                return;
+            }
+            document.getElementById('active-turn-banner').classList.remove('hidden');
+
+            const totalShares = acc.members.reduce((sum, m) => sum + (parseInt(m.shares) || 0), 0);
+            const payoutAmount = totalShares * (parseInt(acc.amount) * parseInt(acc.interval));
+
+            const activeTurnIndex = acc.turns.findIndex(t => !t.taken);
+            let activeTurn = activeTurnIndex !== -1 ? acc.turns[activeTurnIndex] : acc.turns[acc.turns.length - 1];
+            let nextTurn = (activeTurnIndex !== -1 && activeTurnIndex + 1 < acc.turns.length) ? acc.turns[activeTurnIndex + 1] : null;
+
+            document.getElementById('hero-turn-no').textContent = `လက်ရှိ မဲအလှည့် #${activeTurn.turnNo}`;
+            document.getElementById('hero-member-name').textContent = `${activeTurn.memberName} (အစု #${activeTurn.shareIndex})`;
+            document.getElementById('hero-payout-amount').textContent = `${payoutAmount.toLocaleString()} ကျပ်`;
+            document.getElementById('hero-payout-date').textContent = activeTurn.payoutDate;
+
+            const daysLeft = getDaysDifference(activeTurn.payoutDate);
+            const daysLeftBadge = document.getElementById('hero-days-left');
+            if (activeTurn.taken) {
+                daysLeftBadge.textContent = "✅ ထုတ်ယူပြီးပါပြီ";
+                daysLeftBadge.className = "bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs px-3 py-1 rounded-full font-bold";
+            } else if (daysLeft < 0) {
+                daysLeftBadge.textContent = `⚠️ ${Math.abs(daysLeft)} ရက် ကျော်လွန်နေပါပြီ`;
+                daysLeftBadge.className = "bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs px-3 py-1 rounded-full font-bold";
+            } else if (daysLeft === 0) {
+                daysLeftBadge.textContent = "🎉 ဒီနေ့ မဲထုတ်ယူရမည့်ရက်";
+                daysLeftBadge.className = "bg-amber-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full";
+            } else {
+                daysLeftBadge.textContent = `⏳ ထုတ်ယူရန် ${daysLeft} ရက် လိုသေးသည်`;
+                daysLeftBadge.className = "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs px-3 py-1 rounded-full font-bold";
+            }
+
+            if (nextTurn) {
+                document.getElementById('hero-next-name').textContent = `#${nextTurn.turnNo} - ${nextTurn.memberName}`;
+                document.getElementById('hero-next-date').textContent = nextTurn.payoutDate;
+            } else {
+                document.getElementById('hero-next-name').textContent = "နောက်ထပ် မဲအလှည့် မရှိတော့ပါ";
+                document.getElementById('hero-next-date').textContent = "-";
+            }
+        }
+
+        function getDaysDifference(targetDateStr) {
+            const target = new Date(targetDateStr);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            target.setHours(0,0,0,0);
+            return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+        }
+
+        function renderDashboardOverviewCards(acc) {
+            if (!acc) return;
+            const totalMembers = acc.members.length;
+            const totalShares = acc.members.reduce((sum, m) => sum + (parseInt(m.shares) || 0), 0);
+
+            let grandTotalCollected = 0;
+            let grandTotalPending = 0;
+            let takenCount = 0;
+
+            if (acc.turns) {
+                acc.turns.forEach(t => {
+                    const summary = getTurnPaymentSummary(t);
+                    grandTotalCollected += summary.paidAmount;
+                    grandTotalPending += summary.pendingAmount;
+                    if (t.taken) takenCount++;
+                });
+            }
+
+            const percentProgress = acc.turns && acc.turns.length > 0 ? Math.round((takenCount / acc.turns.length) * 100) : 0;
+
+            document.getElementById('card-total-collected').textContent = `${grandTotalCollected.toLocaleString()} ကျပ်`;
+            document.getElementById('card-total-pending').textContent = `${grandTotalPending.toLocaleString()} ကျပ်`;
+            document.getElementById('card-total-shares').textContent = `${totalMembers} ဦး (${totalShares} စာ)`;
+            document.getElementById('card-progress-percent').textContent = `${percentProgress}% ပြီးစီး`;
+        }
+
+        function getTurnPaymentSummary(turn) {
+            if (!currentAccountData || !turn) return { paidCount: 0, totalCount: 0, paidAmount: 0, pendingAmount: 0, perShareTurnAmount: 0 };
+
+            const totalShares = currentAccountData.members.reduce((sum, m) => sum + (parseInt(m.shares) || 0), 0);
+            const perShareTurnAmount = parseInt(currentAccountData.amount) * parseInt(currentAccountData.interval);
+            let paidCount = 0;
+
+            if (!turn.payments) turn.payments = {};
+            currentAccountData.members.forEach(m => {
+                const count = parseInt(m.shares) || 1;
+                for (let s = 1; s <= count; s++) {
+                    if (turn.payments[`${m.id}_${s}`]) paidCount++;
+                }
+            });
+
+            return {
+                paidCount,
+                totalCount: totalShares,
+                paidAmount: paidCount * perShareTurnAmount,
+                pendingAmount: (totalShares - paidCount) * perShareTurnAmount,
+                perShareTurnAmount
+            };
+        }
+
+        function renderDashboardCardsGrid() {
+            if (!currentAccountData) return;
+
+            const gridContainer = document.getElementById('dashboard-cards-grid');
+            gridContainer.innerHTML = '';
+
+            const searchValue = document.getElementById('search-input').value.toLowerCase();
+            const filterValue = document.getElementById('status-filter').value;
+
+            if (!currentAccountData.turns || currentAccountData.turns.length === 0) {
+                gridContainer.innerHTML = `<div class="col-span-full glass-panel p-8 rounded-2xl text-center text-xs text-slate-500">မဲအလှည့် မရှိသေးပါ။</div>`;
+                return;
+            }
+
+            currentAccountData.turns.forEach(t => {
+                const matchesSearch = t.memberName.toLowerCase().includes(searchValue);
+                let matchesFilter = true;
+                if (filterValue === 'pending') matchesFilter = !t.taken;
+                if (filterValue === 'taken') matchesFilter = t.taken;
+
+                if (matchesSearch && matchesFilter) {
+                    const paySummary = getTurnPaymentSummary(t);
+                    const isAllPaid = paySummary.paidCount === paySummary.totalCount;
+                    const percentPaid = Math.round((paySummary.paidCount / (paySummary.totalCount || 1)) * 100);
+                    const daysLeft = getDaysDifference(t.payoutDate);
+
+                    const card = document.createElement('div');
+                    card.onclick = () => openPaymentModal(t.turnNo);
+                    card.className = `glass-panel p-4 rounded-2xl shadow-xl transition-all cursor-pointer hover:border-amber-500/60 relative overflow-hidden ${
+                        t.taken ? 'border-purple-500/40' : (isAllPaid ? 'border-emerald-500/50' : 'border-amber-500/30')
+                    }`;
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-black px-2.5 py-1 rounded-full">
+                                မဲအလှည့် #${t.turnNo}
+                            </span>
+                            <span class="text-[11px] font-bold px-2.5 py-1 rounded-xl border ${
+                                t.taken 
+                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' 
+                                : 'bg-slate-950 text-amber-400 border-amber-500/30'
+                            }">
+                                ${t.taken ? '✅ ထုတ်ပြီး' : '⏳ မထုတ်ရသေး'}
+                            </span>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="text-[10px] text-slate-400 font-bold uppercase">မဲပေါက်သူ / ထုတ်ယူမည့်သူ</div>
+                            <div class="text-lg font-black text-white">${t.memberName} <span class="text-xs text-amber-400/80">(အစု #${t.shareIndex})</span></div>
+                            <div class="text-xs text-emerald-400 font-bold flex justify-between items-center mt-1">
+                                <span><i class="fa-solid fa-calendar-day mr-1"></i> ${t.payoutDate}</span>
+                                <span class="text-[10px] text-slate-400 font-normal">(${daysLeft > 0 ? daysLeft + ' ရက်လို' : (daysLeft === 0 ? 'ဒီနေ့' : Math.abs(daysLeft) + ' ရက်လွန်')})</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[11px] font-bold">
+                                <span class="text-slate-400">မဲကြေးကောက်ခံမှု:</span>
+                                <span class="${isAllPaid ? 'text-emerald-400' : 'text-amber-400'}">${paySummary.paidCount} / ${paySummary.totalCount} စာ (${percentPaid}%)</span>
+                            </div>
+                            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                                <div class="bg-gradient-to-r from-amber-500 to-emerald-400 h-full transition-all duration-300" style="width: ${percentPaid}%"></div>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 pt-2.5 border-t border-slate-800 flex justify-between items-center text-[11px] text-amber-400 font-bold">
+                            <span>အသေးစိတ် ကြည့်ရန် နှိပ်ပါ</span>
+                            <i class="fa-solid fa-circle-arrow-right"></i>
+                        </div>
+                    `;
+                    gridContainer.appendChild(card);
+                }
+            });
+        }
+
+        function openPaymentModal(turnNo) {
+            currentSelectedTurnNo = turnNo;
+            if(!currentAccountData) return;
+            const turn = currentAccountData.turns.find(t => t.turnNo === turnNo);
+            if (!turn) return;
+
+            document.getElementById('modal-turn-badge').textContent = `မဲအလှည့် #${turn.turnNo}`;
+            document.getElementById('pay-modal-title').textContent = `${turn.memberName} ၏ မဲအလှည့်`;
+            document.getElementById('pay-modal-subtitle').textContent = `မဲထုတ်ရမည့်ရက်: ${turn.payoutDate}`;
+
+            renderPaymentModalContent();
+            document.getElementById('payment-modal').classList.replace('hidden', 'flex');
+        }
+
+        function renderPaymentModalContent() {
+            if(!currentAccountData) return;
+            const turn = currentAccountData.turns.find(t => t.turnNo === currentSelectedTurnNo);
+            if (!turn) return;
+
+            const summary = getTurnPaymentSummary(turn);
+            const totalPayoutAmount = summary.totalCount * summary.perShareTurnAmount;
+
+            document.getElementById('modal-payout-amt').textContent = `${totalPayoutAmount.toLocaleString()} ကျပ်`;
+            document.getElementById('modal-payout-status').textContent = turn.taken ? '✅ ထုတ်ယူပြီးပါပြီ' : '⏳ မထုတ်ယူရသေးပါ';
+
+            document.getElementById('modal-paid-amt').textContent = `${summary.paidAmount.toLocaleString()} ကျပ်`;
+            document.getElementById('modal-paid-count').textContent = `(${summary.paidCount} / ${summary.totalCount} စာ ပေးပြီး)`;
+
+            document.getElementById('modal-pending-amt').textContent = `${summary.pendingAmount.toLocaleString()} ကျပ်`;
+            document.getElementById('modal-pending-count').textContent = `(${summary.totalCount - summary.paidCount} / ${summary.totalCount} စာ ကျန်)`;
+
+            const unpaidList = document.getElementById('payment-list-unpaid');
+            const paidList = document.getElementById('payment-list-paid');
+            unpaidList.innerHTML = '';
+            paidList.innerHTML = '';
+
+            let unpaidCount = 0;
+            let paidCount = 0;
+
+            currentAccountData.members.forEach(m => {
+                const sharesCount = parseInt(m.shares) || 1;
+                for (let s = 1; s <= sharesCount; s++) {
+                    const key = `${m.id}_${s}`;
+                    const isPaid = turn.payments && turn.payments[key];
+
+                    const item = document.createElement('div');
+                    item.className = 'flex justify-between items-center p-2.5 text-xs bg-slate-900 rounded-xl border border-slate-800';
+                    item.innerHTML = `
+                        <div>
+                            <span class="font-bold text-slate-200">${m.name}</span>
+                            <span class="text-[10px] text-amber-400 ml-1">(အစု #${s})</span>
+                            <div class="text-[10px] text-slate-400">${summary.perShareTurnAmount.toLocaleString()} ကျပ်</div>
+                        </div>
+                        <span class="px-3 py-1 rounded-lg text-[10px] font-bold ${
+                            isPaid 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        }">
+                            ${isPaid ? '✓ ပေးပြီး' : '⚠️ ပေးရန်ကျန်'}
+                        </span>
+                    `;
+
+                    if (isPaid) {
+                        paidList.appendChild(item);
+                        paidCount++;
+                    } else {
+                        unpaidList.appendChild(item);
+                        unpaidCount++;
+                    }
+                }
+            });
+
+            document.getElementById('badge-unpaid-count').textContent = unpaidCount;
+            document.getElementById('badge-paid-count').textContent = paidCount;
+
+            if (unpaidCount === 0) unpaidList.innerHTML = '<p class="text-[11px] text-emerald-400 text-center py-4 font-bold">🎉 အားလုံး မဲကြေး ပေးပြီးပါပြီ</p>';
+            if (paidCount === 0) paidList.innerHTML = '<p class="text-[11px] text-slate-500 text-center py-4">မဲကြေးပေးပြီးသူ မရှိသေးပါ</p>';
+        }
+
+        function closePaymentModal() {
+            document.getElementById('payment-modal').classList.replace('flex', 'hidden');
+            currentSelectedTurnNo = null;
+        }
+
+        function renderMembersTable() {
+            if(!currentAccountData) return;
+
+            const tbody = document.getElementById('members-table-body');
+            tbody.innerHTML = '';
+
+            if (currentAccountData.members.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-xs text-slate-500">အဖွဲ့ဝင် စာရင်း မရှိသေးပါ။</td></tr>`;
+                return;
+            }
+
+            currentAccountData.members.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-white">${m.name}</td>
+                    <td class="p-3 text-xs text-slate-400">${m.phone || '-'}</td>
+                    <td class="p-3 text-center font-bold text-amber-400">${m.shares} စာ</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderAuditSelect() {
+            if(!currentAccountData) return;
+
+            const select = document.getElementById('audit-member-select');
+            select.innerHTML = '';
+            currentAccountData.members.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = `${m.name} (${m.shares} စာဝယ်ထားသူ)`;
+                select.appendChild(opt);
+            });
+            renderMemberAuditDetails();
+        }
+
+        function renderMemberAuditDetails() {
+            if(!currentAccountData) return;
+
+            const select = document.getElementById('audit-member-select');
+            const box = document.getElementById('audit-details-box');
+            
+            const memberId = parseInt(select.value);
+            const member = currentAccountData.members.find(m => m.id === memberId);
+
+            if (!member) {
+                box.innerHTML = '<p class="text-xs text-slate-500">အဖွဲ့ဝင် မရှိသေးပါ</p>';
+                return;
+            }
+
+            const memberTurns = currentAccountData.turns.filter(t => t.memberId === memberId);
+
+            let slotsHtml = '';
+            memberTurns.forEach((t) => {
+                const daysLeft = getDaysDifference(t.payoutDate);
+                let statusBadge = '';
+
+                if (t.taken) {
+                    statusBadge = `<span class="bg-purple-500/20 text-purple-300 text-xs px-2.5 py-1 rounded-full font-bold">✅ ထုတ်ယူပြီး</span>`;
+                } else if (daysLeft < 0) {
+                    statusBadge = `<span class="bg-rose-500/20 text-rose-300 text-xs px-2.5 py-1 rounded-full font-bold">⚠️ ${Math.abs(daysLeft)} ရက်ကျော်လွန်</span>`;
+                } else if (daysLeft === 0) {
+                    statusBadge = `<span class="bg-emerald-500/20 text-emerald-300 text-xs px-2.5 py-1 rounded-full font-bold">🎉 ဒီနေ့ မဲထုတ်ရမည်</span>`;
+                } else {
+                    statusBadge = `<span class="bg-amber-500/20 text-amber-300 text-xs px-2.5 py-1 rounded-full font-bold">⏳ ${daysLeft} ရက် လိုသေးသည်</span>`;
+                }
+
+                slotsHtml += `
+                    <div class="p-4 border border-slate-800 rounded-2xl glass-panel flex flex-wrap justify-between items-center gap-3">
+                        <div>
+                            <div class="font-bold text-sm gold-gradient-text">မဲအလှည့် #${t.turnNo} (အစု #${t.shareIndex})</div>
+                            <div class="text-xs text-slate-400">ထုတ်ယူရမည့်ရက်: <b class="text-white">${t.payoutDate}</b></div>
+                        </div>
+                        <div>${statusBadge}</div>
+                    </div>
+                `;
+            });
+
+            box.innerHTML = `
+                <div class="glass-panel p-6 rounded-2xl shadow space-y-4">
+                    <div class="border-b border-slate-800 pb-3 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-lg gold-gradient-text">${member.name} ၏ စာရင်း</h3>
+                            <p class="text-xs text-slate-400">ဖုန်း: ${member.phone || '-'} | အစု: <b class="text-amber-400">${member.shares} စာ</b></p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">${slotsHtml || '<p class="text-xs text-slate-500">မဲအလှည့် မရှိသေးပါ။</p>'}</div>
+                </div>
+            `;
+        }
+      function openJoinModal() { document.getElementById('join-account-modal').classList.replace('hidden', 'flex'); }
+        function closeJoinModal() { document.getElementById('join-account-modal').classList.replace('flex', 'hidden'); }
+
+        function submitJoinAccount() {
+            const inputId = document.getElementById('input-join-id').value.trim().toUpperCase();
+            if (!inputId) { alert('Account ID ရိုက်ထည့်ပါ'); return; }
+
+            connectToAccount(inputId);
+            closeJoinModal();
+            document.getElementById('input-join-id').value = '';
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.className = "tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-300 border border-slate-800");
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabName}`).className = "tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20";
+        }
+    </script>
+</body>
+</html>
