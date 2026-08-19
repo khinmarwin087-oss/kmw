@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="my" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>စမတ် မဲစုကြေး စီမံခန့်ခွဲမှုစနစ် (Cloud Edition)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Padauk:wght@400;700&family=Inter:wght@500;600;700&display=swap');
+        body { font-family: 'Padauk', 'Inter', sans-serif; }
+        .glass-panel { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .brand-btn { background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%); color: #fff; }
+        .brand-btn:hover { background: linear-gradient(135deg, #818CF8 0%, #6366F1 100%); }
+    </style>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[80] flex flex-col gap-2 w-[calc(100%-2rem)] max-w-xs"></div>
+
+    <!-- Safety Confirmation Pop-up Modal (Delete Protection) -->
+    <div id="confirm-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-[75]">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center space-y-4">
+            <div class="w-12 h-12 mx-auto bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl flex items-center justify-center text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <p id="confirm-modal-text" class="text-sm text-slate-200 leading-relaxed"></p>
+            <div class="flex gap-3">
+                <button onclick="closeConfirmModal(false)" class="flex-1 px-4 py-2.5 text-xs font-bold rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800">မဖျက်ပါ</button>
+                <button id="confirm-modal-ok" onclick="closeConfirmModal(true)" class="flex-1 px-4 py-2.5 text-xs font-black rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20">ဖျက်မည်</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Login View -->
+    <div id="login-view" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-2xl max-w-md w-full text-center space-y-6 shadow-2xl">
+            <div class="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-400 rounded-2xl flex items-center justify-center mx-auto text-white text-2xl shadow-lg">
+                <i class="fa-solid fa-layer-group"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-extrabold text-white">မဲစုကြေး စီမံခန့်ခွဲမှုစနစ်</h1>
+                <p class="text-xs text-slate-400 mt-2">စနစ်ကို စတင်အသုံးပြုရန် Google Account ဖြင့် Login ဝင်ပေးပါ။</p>
+            </div>
+            <button onclick="loginWithGoogle()" class="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm py-3.5 px-4 rounded-xl flex items-center justify-center gap-3 shadow-xl transition">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5" alt="Google">
+                <span>Sign in with Google</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-view" class="hidden min-h-screen flex flex-col">
+        
+        <!-- Header View -->
+        <header class="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-lg">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </div>
+                    <div>
+                        <span class="text-sm font-bold text-white block" id="header-acc-name">မဲစုကြေး Dashboard</span>
+                        <span id="owner-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400"></span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <img id="user-photo" src="" class="w-8 h-8 rounded-full border border-indigo-500" alt="User">
+                    <button onclick="logout()" class="text-slate-400 hover:text-rose-400 text-xs font-bold p-1">
+                        <i class="fa-solid fa-right-from-bracket text-base"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-4xl mx-auto p-4 sm:p-6 w-full flex-1">
+
+            <!-- Top Primary Actions -->
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <button onclick="openJoinModal()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-indigo-300 font-bold text-xs py-3 rounded-xl shadow flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-key"></i> ID ဖြင့် ဝင်မည်
+                </button>
+                <button onclick="openNewAccountModal()" class="brand-btn font-bold text-xs py-3 rounded-xl shadow flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus"></i> + အကောင့်သစ်
+                </button>
+            </div>
+
+            <!-- Saved Accounts Section -->
+            <div class="space-y-3">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">သိမ်းဆည်းထားသော စုကြေးအကောင့်များ</h3>
+                <div id="accounts-card-list" class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                    <!-- Dynamic Account Cards will be rendered here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Join by ID Modal -->
+    <div id="join-account-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-extrabold text-white"><i class="fa-solid fa-key mr-2 text-indigo-400"></i> Account ID ဖြင့် ဝင်မည်</h3>
+                <button onclick="closeJoinModal()"><i class="fa-solid fa-xmark text-slate-400"></i></button>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">Account ID ရိုက်ထည့်ပါ</label>
+                <input type="text" id="input-join-id" placeholder="892-410" class="w-full p-3 text-center font-bold tracking-widest text-lg bg-slate-950 border border-slate-700 rounded-xl text-indigo-300 uppercase focus:outline-none">
+            </div>
+            <button onclick="submitJoinAccount()" class="w-full brand-btn font-bold text-xs py-3 rounded-xl">အကောင့်သို့ ဝင်မည်</button>
+        </div>
+    </div>
+
+    <!-- Create New Account Modal -->
+    <div id="new-account-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-extrabold text-white"><i class="fa-solid fa-plus mr-2 text-indigo-400"></i> အကောင့်အသစ် တည်ဆောက်မည်</h3>
+                <button onclick="closeNewAccountModal()"><i class="fa-solid fa-xmark text-slate-400"></i></button>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">အကောင့်အမည်</label>
+                <input type="text" id="new-acc-name" placeholder="ဥပမာ - ရွှေစုကြေး" class="w-full p-2.5 text-xs bg-slate-950 border border-slate-700 rounded-xl text-white">
+            </div>
+            <button onclick="submitCreateAccount()" class="w-full brand-btn font-bold text-xs py-3 rounded-xl mt-3">အကောင့် တည်ဆောက်မည်</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
